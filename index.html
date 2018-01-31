@@ -129,7 +129,7 @@
           //console.log("URL: ", signedURLStr);
 		  
           $('#generated-urls-header').fadeIn();
-          $('#generated-urls').fadeIn().prepend($('<li>').append($('<a>').attr('href', signedURLStr).text(url)).hide().fadeIn());
+          $('#generated-urls').fadeIn().prepend($('<li>').append($('<a>').attr('href', signedURLStr).attr('target', "_blank").text(url)).hide().fadeIn());
         });
       });
 	  
@@ -233,15 +233,15 @@
           <fieldset>
             <div class="pure-control-group">
               <label for="url">URL</label>
-              <input type='text' name='url' placeholder="https://[BUCKET].s3.amazonaws.com/[FILE_PATH]" value='https://expiry-test.s3.amazonaws.com/hello.txt'>
+              <input type='text' name='url' placeholder="https://expiry-test.s3.amazonaws.com/hello.txt" value=''>
             </div>
             <div class="pure-control-group">
               <label for="access_key">AccessKey</label>
-              <input type='text' name='access_key' placeholder="Your Access Key" value='AKIAIPPIQEPELJQRXYKQ'>
+              <input type='text' name='access_key' placeholder="Your Access Key" value=''>
             </div>
             <div class="pure-control-group">
               <label for="secret_key">SecretKey</label>
-              <input type='text' name='secret_key' placeholder="Your Secret Key" value='9qfILI9vN/Iz1mU62MkwP7fD5etoLNoJoARx0ZNN'>
+              <input type='text' name='secret_key' placeholder="Your Secret Key" value=''>
             </div>
             <div class="pure-control-group">
               <label for="expiration">Expiration</label>
@@ -250,24 +250,24 @@
             <div class="pure-control-group">
               <label for="region">Region</label>
               <select name='region'>
-                <option>us-east-1</option>
-				<option>us-east-2</option>
-                <option>us-west-1</option>				
-                <option>us-west-2</option>
-                <option>eu-central-1</option>
-				<option>eu-west-1</option>
-				<option>eu-west-2</option>
-				<option>eu-west-3</option>
-                <option>sa-east-1</option>
-				<option>ap-south-1</option>
-                <option>ap-northeast-1</option>
-				<option>ap-northeast-2</<option>
-                <option>ap-southeast-1</option>
-                <option>ap-southeast-2</option>
-				<option>ca-central-1</option>
-				<option>cn-north-1</option>
-				<option>cn-northwest-1</option>
-              </select><br>
+                <option value="us-east-1">US East (N. Virginia)</option>
+				<option value="us-east-2">US East (Ohio)</option>
+                <option value="us-west-1">US West (N. California)</option>				
+                <option value="us-west-2">US West (Oregon)</option>
+                <option value="eu-central-1">EU (Frankfurt)</option>
+				<option value="eu-west-1">EU (Ireland)</option>
+				<option value="eu-west-2">EU (London)</option>
+				<option value="eu-west-3">EU (Paris)</option>
+                <option value="sa-east-1">South America (São Paulo)</option>
+				<option value="ap-south-1">Asia Pacific (Mumbai)</option>
+                <option value="ap-northeast-1">Asia Pacific (Tokyo)</option>
+				<option value="ap-northeast-2">Asia Pacific (Seoul)</<option>
+                <option value="ap-southeast-1">Asia Pacific (Singapore)</option>
+                <option value="ap-southeast-2">Asia Pacific (Sydney)</option>
+				<option value="ca-central-1">Canada (Central)</option>
+				<option value="cn-north-1">China (Beijing)</option>
+				<option value="cn-northwest-1">China (Ningxia)</option>
+              </select> <a target="aws_regions" href="https://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region">List of regions</a><br>
             </div>
 
             <div class="pure-controls">
