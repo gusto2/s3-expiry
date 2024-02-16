@@ -1,281 +1,81 @@
 <!DOCTYPE html>
-<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
-<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
-<!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
-<!--[if gt IE 8]><!--> <html class="no-js"> <!--<![endif]-->
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-
-    <title>AWS S3 Expiring Link Generator</title>
-
-    <meta name="description" content="AWS S3 Expiring Link Generator">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-
-    <script src="./js/rollups/hmac-sha256.js"></script>
-    <script src="./js/components/enc-base64-min.js"></script>
-    <script src="http://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
-    <script>
-      $(function() {
-        var parsedURL = function(url) {
-          var url_split = url.split(/\/+/);
-          return {
-            "original": url,
-            "protocol": url_split[0] + "//",
-            "domain": url_split[1],
-            "path": "/" + (url_split.length >= 3 ? url_split.slice(2) : []).join("/")
-          }
-        };
-		
-		
-		
-        var urlSigningParams = function(access, expiration, region, iso8601, shortDate) {
-          var params = '';
-          params += "X-Amz-Algorithm=AWS4-HMAC-SHA256&";
-          params += "X-Amz-Credential=" + access + "%2F" + shortDate + "%2F" + region + "%2Fs3%2Faws4_request&";
-          params += "X-Amz-Date=" + iso8601 + "&";
-          params += "X-Amz-Expires=" + expiration + "&";
-          params += "X-Amz-SignedHeaders=host"
-          return params;
-        };
-		
-		/**
-		* CanonicalRequest =
-		* HTTPRequestMethod + '\n' +
-		* CanonicalURI + '\n' +
-		* CanonicalQueryString + '\n' +
-		* CanonicalHeaders + '\n' +
-		* SignedHeaders + '\n' +
-		* HexEncode(Hash(RequestPayload))
-		*/
-        var canonicalRequest = function(parsed, params, expiration) {
-          var request = "GET\n";
-          request += parsed.path + "\n";
-          request += params + "\n";
-          request += "host:" + parsed.domain  + "\n\n";
-          request += "host\n";
-          request += "UNSIGNED-PAYLOAD";
-          return request;
-        };
-		
-        var stringToSign = function(iso8601, shortDate, canonicalReq,region) {
-		  var str = "AWS4-HMAC-SHA256\n";
-          str += iso8601 + "\n";
-          str += shortDate + "/"+region+"/s3/aws4_request\n";
-          str += CryptoJS.enc.Hex.stringify(CryptoJS.SHA256(canonicalReq));
-          return str;
-        };
-		
-        var hmacSHA256 = function(a, b) {
-          // AWS Docs pass the secret first, we swap it to be compatible
-          return CryptoJS.HmacSHA256(b, a);
-		  //return CryptoJS.HmacSHA256(a,b);
-        };
-		
-        var signingKey = function(secret, shortDate, region, service) {
-		
-		  var kSecret = CryptoJS.enc.Utf8.parse("AWS4"+secret);
-		  //console.log('kSecret: '+kSecret.toString());
-		  var kDate = hmacSHA256(kSecret, CryptoJS.enc.Utf8.parse(shortDate))
-		  //console.log('kDate: '+kDate.toString());
-		  var kRegion = hmacSHA256(kDate, region);
-		  //console.log('kRegion: '+kRegion.toString());
-		  var kService=hmacSHA256(kRegion, service);
-		  //console.log('kService: '+kService.toString());
-		  var kSigning = hmacSHA256(kService, "aws4_request");
-		  //console.log('kSigning: '+kSigning.toString());
-		  return kSigning;
-        };
-		
-        var signedURL = function(url, requestParamStr, signature, key, expiration) {
-          var signedURLStr = url + "?";
-          signedURLStr += requestParamStr;
-          signedURLStr += '&X-Amz-Signature=' + encodeURIComponent(CryptoJS.enc.Hex.stringify(signature));
-          return signedURLStr;
-        };
-		
-        $('#expiry-submit').on('click', function(e){
-          e.preventDefault();
-          var form = $(e.target).closest('form');
-          formBlob = {};
-          form.serializeArray().forEach(function(obj) {
-            formBlob[obj.name] = obj.value;
-          });
-          var url = formBlob.url;
-          var access = formBlob.access_key;
-          var secret = formBlob.secret_key;
-          var expiration = formBlob.expiration;
-          var region = formBlob.region
-          var date = new Date();
-          var iso8601 = date.toISOString().replace(/\-|:|\.\d+/g, '');
-		  //console.log('iso8601: '+iso8601);
-          var shortDate = iso8601.replace(/T.*/, '');
-		  //console.log('short date: '+shortDate);
-		  
-          var parsedURLArr = parsedURL(url);
-		  //console.log('parsed url: '+ JSON.stringify(parsedURLArr));
-          var requestParamStr = urlSigningParams(access, expiration, region, iso8601, shortDate);
-          var canonicalReq = canonicalRequest(parsedURLArr, requestParamStr, expiration);
-          //console.log("Canonical: ", canonicalReq);
-		  //console.log(CryptoJS.enc.Utf8.parse(canonicalReq).toString());
-          var stringToSignVar = stringToSign(iso8601, shortDate, canonicalReq,region);
-          //console.log("SigningStr: ", stringToSignVar);
-		  //console.log(CryptoJS.enc.Utf8.parse(stringToSignVar).toString());
-          var signingKeyVar = signingKey(secret, shortDate, region, "s3");
-          //console.log("SigningKey: ", CryptoJS.enc.Base64.stringify(signingKeyVar));
-          var signature = hmacSHA256(signingKeyVar, stringToSignVar);
-          //console.log("Signature: ", CryptoJS.enc.Base64.stringify(signature));
-          var signedURLStr = signedURL(url, requestParamStr, signature,access, expiration);
-          //console.log("URL: ", signedURLStr);
-		  
-          $('#generated-urls-header').fadeIn();
-          $('#generated-urls').fadeIn().prepend($('<li>').append($('<a>').attr('href', signedURLStr).attr('target', "_blank").text(url)).hide().fadeIn());
-        });
-      });
-	  
-    </script>
-    <link rel="stylesheet" href="http://yui.yahooapis.com/pure/0.5.0/pure-min.css">
-    <style>
-      .content {
-          margin: 0 auto;
-          padding: 0 2em;
-          max-width: 800px;
-          margin-bottom: 50px;
-          line-height: 1.6em;
-      }
-      .header {
-           margin: 0;
-           color: #333;
-           text-align: center;
-           padding: 2.5em 2em 0;
-           border-bottom: 1px solid #eee;
-       }
-          .header h1 {
-              margin: 0.2em 0;
-              font-size: 3em;
-              font-weight: 300;
-          }
-           .header h2 {
-              font-weight: 300;
-              color: #ccc;
-              padding: 0;
-              margin-top: 0;
-          }
-      .content-subhead {
-          margin: 50px 0 20px 0;
-          font-weight: 300;
-          color: #888;
-      }
-      body {
-          color: #777;
-      }
-      a {
-        color: #428bca;
-        text-decoration: none;
-        background: 0 0;
-      }
-      a:active, a:hover {
-        color: #2a6496;
-        text-decoration: underline;
-        outline: 0;
-      }
-      a:visited {
-        color: #428bca;
-        text-decoration: none;
-        background: 0 0;
-      }
-      .pure-form-aligned .pure-control-group label {
-        width: 6em;
-      }
-      .pure-form input {
-        width: 28em;
-      }
-      .content {
-        max-width: 90%;
-      }
-      .hidden {
-        display: none;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="header">
-      <h1>AWS S3 Expiring Link Generator</h1>
-      <h2>A quick alternative to the command line</h2>
-    </div>
-
-    <div class="content pure-g">
-      <div class="pure-u-1-2">
-        <h2 id="generated-urls-header" class="content-subhead hidden">Generated Links</h2>
-        <ul id="generated-urls" class="hidden"></ul>
-
-        <h2 class="content-subhead">What's all this?</h2>
-        <p>
-          Amazon S3 provides a great place to store all sorts of files but sometimes managing permissions can be a bit of a pain.
-          Built-in to S3 is the ability to generate links to private files that expire after a set period of time.
-          This tool generates those for you so you don't have to fiddle with the command line or install any 3rd party tools.
-        </p>
-
-        <h2 class="content-subhead">Won't you steal my key?</h2>
-        <p>
-          Your secret key is safe, all code runs client side. The <a href="https://github.com/pcorliss/s3-expiry">code is also available</a> in case you don't trust me.
-        </p>
-
-        <h2 class="content-subhead">Who are you?</h2>
-        <p>
-          I'm <a href="https://twitter.com/pcorliss">Phil</a>. I sometimes write things at <a href="http://blog.50projects.com">blog.50projects.com</a>
-        </p>
-      </div>
-
-      <div class="pure-u-1-2">
-        <h2 class="content-subhead">Enter your S3 URL and Connectivity Info</h2>
-        <form id="expiry" class="pure-form pure-form-aligned">
-          <fieldset>
-            <div class="pure-control-group">
-              <label for="url">URL</label>
-              <input type='text' name='url' placeholder="https://expiry-test.s3.amazonaws.com/hello.txt" value=''>
+<html lang="en">
+    <head>
+        <title>S3 presigned URL generator</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="author" content="Gabriel Vince">
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+        <!-- Build your own version of the AWS SDK for JavaScript
+        using S3 only
+        https://sdk.amazonaws.com/builder/js/ -->
+        <script src="./js/aws-sdk-2.1559.0.min.js"></script>
+        
+        <style>
+        .errorText {
+          background-color: orange;
+        }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div><span class="errorText" id="alertText"></span></div>
+            <div>
+                <div class="row gap-2 p-1">
+                    <div class="col-sm"><label for="AWS_ACCESS_KEY">AWS_ACCESS_KEY</label></div>
+                    <div class="col-sm">
+                        <input id="AWS_ACCESS_KEY" name="AWS_ACCESS_KEY" type="text" required size="40" placeholder="AWS_ACCESS_KEY" />
+                    </div>
+                </div>
+                <div class="row gap-2 p-1">
+                    <div class="col-sm"><label for="AWS_ACCESS_SECRET_KEY">AWS_ACCESS_SECRET_KEY</label></div>
+                    <div class="col-sm">
+                        <input id="AWS_ACCESS_SECRET_KEY" name="AWS_ACCESS_SECRET_KEY" type="password" required size="40" placeholder="AWS_ACCESS_SECRET_KEY" />
+                    </div>
+                </div>
+                <div class="row gap-2 p-1">
+                    <div class="col-sm"><label for="AWS_REGION">AWS REGION</label></div>
+                    <div class="col-sm">
+                        <select id="AWS_REGION" name="AWS_REGION">
+                        </select>
+                    </div>
+                </div>
+                <div class="row gap-2 p-1">
+                    <div class="col-sm"><label for="S3_URL">S3 url</label></div>
+                    <div class="col-sm">
+                        <input id="S3_URL" name="S3_URL" type="text" required size="40" placeholder="s3://bucketname/prefix/key" />
+                    </div>
+                </div>
+                <div class="row gap-2 p-1">
+                    <div class="col-sm"><label for="EXPIRES">Expires in (seconds)</label></div>
+                    <div class="col-sm">
+                        <input id="EXPIRES" name="EXPIRES" type="text" required size="40" placeholder="900" value="900" /></div>
+                </div>
+                <div class="row gap-2 p-1">
+                    <div class="col-sm"><label for="action">Action</label></div>
+                    <div class="col-sm">
+                        <select id="action" name="action" title="action">
+                            <option value="download">download</option>
+                            <option value="upload">upload</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="row gap-2 p-1">
+                    <div class="col-sm"></div>
+                    <div class="col-sm"><button id="presignButton" class="btn btn-primary">PRESIGN</button></div>
+                </div>
             </div>
-            <div class="pure-control-group">
-              <label for="access_key">AccessKey</label>
-              <input type='text' name='access_key' placeholder="Your Access Key" value=''>
+            <div class="gap-2 p-1">
+                <div class="row gap-2 p-1">
+                    <div class="col-sm-2" ><span>METHOD</span></div>
+                    <div class="col-sm-8"><span id="method"></span></div>
+                </div>
+                <div class="row gap-2 p-1">
+                    <div class="col-sm-2"><span>URL</span></div>
+                    <div class="col-sm-8"><span id="url"></span></div>
+                </div>
             </div>
-            <div class="pure-control-group">
-              <label for="secret_key">SecretKey</label>
-              <input type='text' name='secret_key' placeholder="Your Secret Key" value=''>
-            </div>
-            <div class="pure-control-group">
-              <label for="expiration">Expiration</label>
-              <input type='text' name='expiration' placeholder="Expiration in Seconds (Max 7 Days)" value='86400'>
-            </div>
-            <div class="pure-control-group">
-              <label for="region">Region</label>
-              <select name='region'>
-                <option value="us-east-1">US East (N. Virginia)</option>
-				<option value="us-east-2">US East (Ohio)</option>
-                <option value="us-west-1">US West (N. California)</option>				
-                <option value="us-west-2">US West (Oregon)</option>
-                <option value="eu-central-1">EU (Frankfurt)</option>
-				<option value="eu-west-1">EU (Ireland)</option>
-				<option value="eu-west-2">EU (London)</option>
-				<option value="eu-west-3">EU (Paris)</option>
-                <option value="sa-east-1">South America (São Paulo)</option>
-				<option value="ap-south-1">Asia Pacific (Mumbai)</option>
-                <option value="ap-northeast-1">Asia Pacific (Tokyo)</option>
-				<option value="ap-northeast-2">Asia Pacific (Seoul)</<option>
-                <option value="ap-southeast-1">Asia Pacific (Singapore)</option>
-                <option value="ap-southeast-2">Asia Pacific (Sydney)</option>
-				<option value="ca-central-1">Canada (Central)</option>
-				<option value="cn-north-1">China (Beijing)</option>
-				<option value="cn-northwest-1">China (Ningxia)</option>
-              </select> <a target="aws_regions" href="https://docs.aws.amazon.com/general/latest/gr/rande.html#s3_region">List of regions</a><br>
-            </div>
-
-            <div class="pure-controls">
-              <button id="expiry-submit" type="submit" class="pure-button pure-button-primary">Submit</button>
-            </div>
-          </fieldset>
-        </form>
-      </div>
-    </div>   
-  </body>
+        </div>
+        <script src="./js/presign.js" ></script>
+    </body>
 </html>
